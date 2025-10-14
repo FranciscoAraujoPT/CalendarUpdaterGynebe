@@ -5,9 +5,9 @@ const simpleGit = require('simple-git');
 
 let win;
 
-const repoPath = path.join(__dirname, 'clinicaGynebe');
+const repoPath = path.join(app.getPath('userData'), 'clinicaGynebe');
 const repoSSH = 'git@github.com:gynebe/gynebe.github.io.git';
-const logFile = path.join(__dirname, 'log.txt');
+const logFile = path.join(app.getPath('userData'), 'log.txt');
 
 // ---------------------
 // Logging

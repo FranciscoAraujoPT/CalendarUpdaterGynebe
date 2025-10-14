@@ -40,7 +40,7 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "assets//icons/win/icon.ico"
+      "icon": "assets/icons/win/icon.ico"
     },
     "linux": {
       "target": "AppImage",
