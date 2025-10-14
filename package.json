@@ -1,0 +1,50 @@
+{
+  "name": "gynebe-calendar",
+  "version": "1.0.0",
+  "description": "Clinica Gynebe Calendar Updater",
+  "main": "main.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "Francisco Araújo",
+  "license": "MIT",
+  "dependencies": {
+    "flatpickr": "^4.6.13",
+    "fs-extra": "^11.3.2",
+    "simple-git": "^3.28.0"
+  },
+  "devDependencies": {
+    "electron": "^38.2.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.gynebe.calendar",
+    "productName": "Gynebe Calendar",
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist",
+      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/.bin",
+      "!clinicaGynebe/",
+      "!**/.*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icons/mac/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets//icons/win/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icons/png"
+    }
+  }
+}
