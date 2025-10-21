@@ -13,14 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const notificationEl = document.getElementById('notification');
 
     let selectedDates = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     // ---------------------
-    // Auto-grow as user types
+    // Auto-grow textarea
     // ---------------------
-
     holidayMsgInput.addEventListener('input', () => {
-        holidayMsgInput.style.height = 'auto'; // reset height
-        holidayMsgInput.style.height = holidayMsgInput.scrollHeight + 'px'; // grow to fit content
+        holidayMsgInput.style.height = 'auto';
+        holidayMsgInput.style.height = holidayMsgInput.scrollHeight + 'px';
     });
 
     // ---------------------
@@ -48,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create specialty cards
     // ---------------------
     function createSpecialtyCards() {
-        specContainer.innerHTML = ''; // clear container
+        specContainer.innerHTML = '';
 
         specialties.forEach(spec => {
             const card = document.createElement('div');
@@ -58,37 +59,147 @@ document.addEventListener('DOMContentLoaded', () => {
                 <input type="text" class="calendar-input" id="calendar-${spec.id}" placeholder="Select dates" readonly>
             `;
             specContainer.appendChild(card);
+            selectedDates[spec.id] = selectedDates[spec.id] || [];
 
             flatpickr(`#calendar-${spec.id}`, {
                 mode: "multiple",
                 dateFormat: "Y-m-d",
-                onChange: (datesArr, dateStr, instance) => {
-                    // Convert all to YYYY-MM-DD format
-                    let formatted = datesArr.map(d => d.toISOString().split('T')[0]);
+                minDate: "today",
+                clickOpens: true, // default, opens when input clicked
+                onClose: function (selectedDates, dateStr, instance) {
+                    // Prevent closing if the date popup is still open
+                    const popup = document.querySelector('.date-popup-overlay');
+                    if (popup) {
+                        instance.open(); // reopen the calendar if popup exists
+                    }
+                },
+                onChange: function (selectedDatesArr, dateStr, instance) {
+                    const lastSelected = instance.latestSelectedDateObj;
+                    if (!lastSelected) return;
 
-                    // Remove duplicates explicitly
-                    formatted = [...new Set(formatted)];
+                    // Use local date to avoid UTC shifts
+                    const year = lastSelected.getFullYear();
+                    const month = (lastSelected.getMonth() + 1).toString().padStart(2, '0');
+                    const day = lastSelected.getDate().toString().padStart(2, '0');
+                    const formattedDate = `${year}-${month}-${day}`;
 
-                    // Save unique dates
-                    selectedDates[spec.id] = formatted;
+                    const stillSelected = selectedDatesArr.some(d => {
+                        return d.getFullYear() === lastSelected.getFullYear() &&
+                            d.getMonth() === lastSelected.getMonth() &&
+                            d.getDate() === lastSelected.getDate();
+                    });
 
-                    // Update field text
-                    const input = document.getElementById(`calendar-${spec.id}`);
-                    input.value = formatted.join(', ');
-
-                    // Auto-grow height for long lists
-                    input.style.height = 'auto';
-                    input.style.height = input.scrollHeight + 'px';
-
-                    // If Flatpickr somehow shows duplicates, reapply unique list
-                    instance.setDate(formatted, false);
-
-                    log(`Selected dates for ${spec.name}: ${formatted.join(', ')}`);
+                    if (stillSelected) {
+                        showDatePopup(spec.id, formattedDate, instance.calendarContainer);
+                    } else {
+                        removeDate(spec.id, formattedDate);
+                        const existingPopup = document.querySelector('.date-popup-overlay');
+                        if (existingPopup) existingPopup.remove();
+                        updateInputDisplay(spec.id);
+                    }
                 }
             });
+
         });
 
         log('Specialty cards created.');
+    }
+
+    // ---------------------
+    // Remove date from selectedDates
+    // ---------------------
+    function removeDate(specId, date) {
+        if (!selectedDates[specId]) return;
+        selectedDates[specId] = selectedDates[specId].filter(d => !d.DataInicio.startsWith(date));
+    }
+
+    // ---------------------
+    // Update text input display
+    // ---------------------
+    function updateInputDisplay(specId) {
+        const input = document.getElementById(`calendar-${specId}`);
+        if (!input) return;
+        input.value = (selectedDates[specId] || []).map(d => {
+            const di = d.DataInicio.split('T')[0];
+            const ti = d.DataInicio.split('T')[1].slice(0, 5);
+            const tf = d.DataFim.split('T')[1].slice(0, 5);
+            return `${di} (${ti}-${tf})`;
+        }).join(', ');
+    }
+
+    // ---------------------
+    // Date popup overlay
+    // ---------------------
+    function showDatePopup(specId, date, calendarContainer) {
+        const oldPopup = document.querySelector('.date-popup-overlay');
+        if (oldPopup) oldPopup.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'date-popup-overlay';
+        overlay.style.position = 'absolute';
+        overlay.style.background = 'white';
+        overlay.style.padding = '15px';
+        overlay.style.borderRadius = '8px';
+        overlay.style.boxShadow = '0 4px 15px rgba(0,0,0,0.25)';
+        overlay.style.zIndex = 2000;
+
+        const rect = calendarContainer.getBoundingClientRect();
+        overlay.style.top = rect.bottom + window.scrollY + 'px';
+        overlay.style.left = rect.left + window.scrollX + 'px';
+        overlay.style.width = rect.width + 'px';
+
+        const existing = selectedDates[specId].find(d => d.DataInicio.startsWith(date)) || {
+            DataInicio: `${date}T00:00:00.000Z`,
+            DataFim: `${date}T23:59:00.000Z`
+        };
+        let allDay = existing.DataInicio.endsWith("00:00:00.000Z") && existing.DataFim.endsWith("23:59:00.000Z");
+
+        overlay.innerHTML = `
+            <div style="margin-bottom:10px;"><strong>${date}</strong></div>
+            <label><input type="checkbox" id="popupAllDay" ${allDay ? 'checked' : ''}> All day</label>
+            <div style="margin-top:10px;">
+                Start: <input type="time" id="popupStart" value="${existing.DataInicio.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
+                End: <input type="time" id="popupEnd" value="${existing.DataFim.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
+            </div>
+            <button id="popupSave" style="margin-top:10px;">Save</button>
+        `;
+        document.body.appendChild(overlay);
+
+        const chkAllDay = document.getElementById('popupAllDay');
+        const startInput = document.getElementById('popupStart');
+        const endInput = document.getElementById('popupEnd');
+        const saveBtn = document.getElementById('popupSave');
+
+        chkAllDay.addEventListener('change', () => {
+            const disabled = chkAllDay.checked;
+            startInput.disabled = disabled;
+            endInput.disabled = disabled;
+        });
+
+        saveBtn.addEventListener('click', () => {
+            const start = chkAllDay.checked ? "00:00" : startInput.value || "09:00";
+            const end = chkAllDay.checked ? "23:59" : endInput.value || "17:00";
+
+            const DataInicio = `${date}T${start}:00.000Z`;
+            const DataFim = `${date}T${end}:00.000Z`;
+
+            const idx = selectedDates[specId].findIndex(d => d.DataInicio.startsWith(date));
+            if (idx !== -1) selectedDates[specId][idx] = { DataInicio, DataFim };
+            else selectedDates[specId].push({ DataInicio, DataFim });
+
+            updateInputDisplay(specId);
+
+            overlay.remove();
+        });
+
+        // Close popup only if click outside BOTH calendar and popup
+        document.addEventListener('click', function handleClickOutside(e) {
+            const calendar = calendarContainer;
+            if (!calendar.contains(e.target) && !overlay.contains(e.target)) {
+                overlay.remove();
+                document.removeEventListener('click', handleClickOutside);
+            }
+        });
     }
 
     // ---------------------
@@ -97,20 +208,17 @@ document.addEventListener('DOMContentLoaded', () => {
     addAllBtn.addEventListener('click', () => {
         const allDates = Object.values(selectedDates).flat();
         specialties.forEach(spec => {
-            const input = document.getElementById(`calendar-${spec.id}`);
-            if (input._flatpickr) {
-                input._flatpickr.setDate(allDates);
-                selectedDates[spec.id] = allDates;
-            }
+            selectedDates[spec.id] = JSON.parse(JSON.stringify(allDates));
+            updateInputDisplay(spec.id);
         });
         log('Added all selected dates to all specialties.');
     });
 
     // ---------------------
-    // Save calendar to repo
+    // Save
     // ---------------------
     saveBtn.addEventListener('click', async () => {
-        const holidaysMessage = holidayMsgInput.value || "Estamos de férias!";
+        const holidaysMessage = holidayMsgInput.value || "Encontramo-nos em férias!";
         const calendarData = { holidays: selectedDates, holidaysMessage };
         loadingOverlay.classList.add('active');
         log('Saving calendar...');
@@ -118,61 +226,60 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const result = await window.electronAPI.saveCalendar(calendarData, 'Update calendar');
             loadingOverlay.classList.remove('active');
-            if (result.success) showNotification('Calendar saved and pushed successfully!');
-            else showNotification('Error saving calendar: ' + result.error, true);
+            if (result.success) showNotification('Calendar saved successfully!');
+            else showNotification('Error saving: ' + result.error, true);
         } catch (err) {
             loadingOverlay.classList.remove('active');
-            showNotification('Error saving calendar: ' + err.message, true);
-            log('Error saving calendar: ' + err.message);
+            showNotification('Error saving: ' + err.message, true);
+            log('Error saving: ' + err.message);
         }
     });
 
     // ---------------------
-    // Initialize after repo is ready
+    // Init
     // ---------------------
     async function init() {
-        // Show loading overlay until repo is ready
         loadingOverlay.classList.add('active');
-
-        // Listen for loading messages from main
-        window.electronAPI.onRepoLoading((msg) => {
+        window.electronAPI.onRepoLoading(msg => {
             loadingOverlay.classList.add('active');
             log('Repo loading: ' + msg);
         });
 
-        // When repo finishes syncing, hide the loading overlay
-        window.electronAPI.onRepoSynced((calendar) => {
-            loadingOverlay.classList.remove('active');
-            // (rest of your code continues as before)
-        });
-
         createSpecialtyCards();
 
-        // Listen for repo sync
-        window.electronAPI.onRepoSynced((calendar) => {
-            log('Repo synced event received.');
-            selectedDates = calendar.holidays || {};
+        window.electronAPI.onRepoSynced(calendar => {
+            loadingOverlay.classList.remove('active');
+            const rawHolidays = calendar.holidays || {};
+            const filtered = {};
+
+            for (const [specId, days] of Object.entries(rawHolidays)) {
+                filtered[specId] = days.filter(d => {
+                    const date = new Date(d.DataInicio);
+                    date.setHours(0, 0, 0, 0);
+                    return date >= today;
+                });
+            }
+
+            selectedDates = filtered;
             holidayMsgInput.value = calendar.holidaysMessage || '';
 
             specialties.forEach(spec => {
                 const input = document.getElementById(`calendar-${spec.id}`);
                 if (input && input._flatpickr) {
-                    const dates = selectedDates[spec.id] || [];
+                    const dates = (selectedDates[spec.id] || []).map(d => new Date(d.DataInicio));
                     input._flatpickr.setDate(dates);
-                    log(`Dates loaded for ${spec.name}: ${dates.join(', ')}`);
+                    updateInputDisplay(spec.id);
                 }
             });
 
-            log('Repository synced. Calendar loaded.');
+            log('Repository synced and filtered calendar loaded.');
         });
 
-        // Listen for repo sync errors
-        window.electronAPI.onRepoSyncError((msg) => {
+        window.electronAPI.onRepoSyncError(msg => {
             showNotification('Error syncing repo: ' + msg, true);
-            log('Error syncing repository: ' + msg);
+            log('Repo sync error: ' + msg);
         });
 
-        // Ask main process to clone/pull and send calendar
         await window.electronAPI.readyToReceive();
     }
 

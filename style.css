@@ -28,7 +28,6 @@ main {
     max-width: 960px;
     margin: auto;
     flex: 1 0 auto;
-    /* grow to fill vertical space */
 }
 
 /* Controls buttons */
@@ -80,26 +79,19 @@ button.primary:hover {
 #holidayMsg {
     width: 100%;
     padding: 12px;
-    /* equal padding on all sides */
     border-radius: 8px;
     border: 1px solid #ccc;
     font-size: 16px;
     resize: vertical;
-    /* allow manual resizing if needed */
     overflow: hidden;
-    /* hide scroll until needed */
     min-height: 40px;
-    /* small initial height */
     box-sizing: border-box;
-    /* include padding in width */
 }
 
-/* Automatically grow textarea as user types */
 #holidayMsg:focus {
     outline: none;
 }
 
-/* optional smooth animation for height changes */
 #holidayMsg {
     transition: height 0.2s ease;
 }
@@ -137,17 +129,13 @@ button.primary:hover {
 .calendar-input {
     width: 100%;
     padding: 12px;
-    /* equal padding left & right */
     border-radius: 6px;
     border: 1px solid #ccc;
     font-size: 16px;
     cursor: pointer;
     resize: none;
-    /* prevent manual resizing */
     overflow-y: hidden;
-    /* hide vertical scrollbar */
     min-height: 38px;
-    /* default height */
     box-sizing: border-box;
 }
 
@@ -155,7 +143,6 @@ button.primary:hover {
 .loading-overlay {
     display: none;
     position: fixed;
-    /* cover entire viewport */
     top: 0;
     left: 0;
     width: 100%;
@@ -164,7 +151,6 @@ button.primary:hover {
     justify-content: center;
     align-items: center;
     z-index: 9999;
-    /* on top of everything */
 }
 
 .loading-overlay.active {
@@ -186,6 +172,68 @@ button.primary:hover {
     }
 }
 
+/* Date popup overlay */
+.date-popup-overlay {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+    padding: 15px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 14px;
+    color: #333;
+    position: absolute;
+    z-index: 1000;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    width: 100%;
+    max-width: 320px;
+    border: 1px solid #ccc;
+}
+
+/* Popup states */
+.date-popup-overlay.show {
+    opacity: 1;
+    transform: scale(1);
+    display: block;
+}
+
+.date-popup-overlay.hide,
+.date-popup-overlay.hidden {
+    opacity: 0;
+    transform: scale(0.95);
+    display: none;
+}
+
+/* Inputs inside popup */
+.date-popup-overlay input[type="time"] {
+    padding: 5px 8px;
+    margin-left: 5px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+.date-popup-overlay input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+/* Save button inside popup */
+.date-popup-overlay button {
+    margin-top: 10px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #28a745;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.date-popup-overlay button:hover {
+    background: #218838;
+}
+
 /* Notifications */
 .notification {
     position: fixed;
@@ -199,7 +247,6 @@ button.primary:hover {
     font-weight: bold;
     font-size: 15px;
     z-index: 10000;
-    /* above overlay */
 }
 
 .notification.error {
@@ -213,4 +260,9 @@ footer {
     color: #777;
     font-size: 14px;
     flex-shrink: 0;
+}
+
+/* === Flatpickr Calendar Layer Fix === */
+.flatpickr-calendar {
+    z-index: 999 !important;
 }

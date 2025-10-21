@@ -1,6 +1,6 @@
 {
   "name": "gynebe-calendar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Clinica Gynebe Calendar Updater",
   "main": "main.cjs",
   "type": "commonjs",
