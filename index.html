@@ -2,48 +2,51 @@
 <html lang="pt-PT">
 
 <head>
-    <meta charset="UTF-8">
-    <title>Update Calendar</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <meta charset="UTF-8">
+  <title>Update Calendar</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 
 <body>
-    <header>
-        <h1>Update Calendar</h1>
-    </header>
+  <header>
+    <h1>Update Calendar</h1>
+  </header>
 
-    <main id="calendarApp">
-        <!-- Holiday message -->
-        <section class="holiday-message">
-            <label for="holidayMsg">Messagem:</label>
-            <textarea id="holidayMsg" placeholder="Estamos de férias!" rows="2"></textarea>
-        </section>
+  <main id="calendarApp">
+    <!-- Holiday message -->
+    <section class="holiday-message">
+      <label for="holidayMsg">Messagem:</label>
+      <textarea id="holidayMsg" placeholder="Estamos de férias!" rows="2"></textarea>
+    </section>
 
-        <!-- Specialty cards container -->
-        <section id="specContainer" class="specialties"></section>
+    <!-- Specialty cards container -->
+    <section id="specContainer" class="specialties">
+      <!-- calendars dynamically generated -->
+    </section>
 
-        <!-- Controls -->
-        <section class="controls">
-            <button id="addAllBtn" class="btn">Adiciona datas para todos</button>
-            <button id="saveBtn" class="btn primary">Salvar</button>
-        </section>
-    </main>
+    <!-- Controls -->
+    <section class="controls">
+      <button id="addAllBtnClose" class="btn">Adicionar mesmas datas (Ferias)</button>
+      <button id="addAllBtnOpen" class="btn">Adicionar mesmas datas (Abertos)</button>
+      <button id="saveBtn" class="btn primary">Salvar</button>
+    </section>
+  </main>
 
-    <!-- Loading overlay outside main to cover everything -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="spinner"></div>
-    </div>
+  <!-- Loading overlay outside main to cover everything -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
 
-    <!-- Notifications -->
-    <div id="notification" class="notification"></div>
+  <!-- Notifications -->
+  <div id="notification" class="notification"></div>
 
-    <footer>
-        <p>© 2025 Clinica Gynebe</p>
-    </footer>
+  <footer>
+    <p>© 2025 Clinica Gynebe</p>
+  </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="./renderer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="./renderer.js"></script>
 </body>
 
 </html>

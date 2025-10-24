@@ -91,6 +91,15 @@ ipcMain.handle('save-calendar-rules', async (event, calendarData, commitMessage 
         const bundleFile = path.join(repoPath, 'js', 'bundle.js');
         const repoGit = simpleGit(repoPath);
 
+        if (!(await fs.pathExists(calendarFile))) {
+            await fs.writeJson(calendarFile, {
+                holidays: {},
+                openExceptions: {},
+                holidaysMessage: "Estamos de férias!"
+            }, { spaces: 4 });
+            await log('calendar-rules.json created.');
+        }
+
         await fs.writeJson(calendarFile, calendarData, { spaces: 4 });
         await log('calendar-rules.json updated');
 

@@ -112,6 +112,7 @@ button.primary:hover {
     flex: 1 1 280px;
     min-width: 280px;
     transition: transform 0.2s, box-shadow 0.2s;
+    margin: 10px;
 }
 
 .spec-card:hover {

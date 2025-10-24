@@ -4,9 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 1, name: "Ginecologia/Obstetrícia" },
         { id: 2, name: "Pediatria" },
     ];
+    const calendarTypes = [
+        { key: "holidays", title: "Fechados", message: "Dias em que estamos fechados" },
+        { key: "openExceptions", title: "Abertos Excecionalmente", message: "Dias em que estamos abertos apesar de ser feriado" }
+    ];
 
     const specContainer = document.getElementById('specContainer');
-    const addAllBtn = document.getElementById('addAllBtn');
+    const addAllBtnClose = document.getElementById('addAllBtnClose');
+    const addAllBtnOpen = document.getElementById('addAllBtnOpen')
     const saveBtn = document.getElementById('saveBtn');
     const holidayMsgInput = document.getElementById('holidayMsg');
     const loadingOverlay = document.getElementById('loadingOverlay');
@@ -49,77 +54,90 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create specialty cards
     // ---------------------
     function createSpecialtyCards() {
-        specContainer.innerHTML = '';
+        const container = document.getElementById('specContainer');
+        container.innerHTML = '';
 
-        specialties.forEach(spec => {
-            const card = document.createElement('div');
-            card.classList.add('spec-card');
-            card.innerHTML = `
-                <h3>${spec.name}</h3>
-                <input type="text" class="calendar-input" id="calendar-${spec.id}" placeholder="Select dates" readonly>
-            `;
-            specContainer.appendChild(card);
-            selectedDates[spec.id] = selectedDates[spec.id] || [];
+        calendarTypes.forEach(type => {
+            const section = document.createElement('section');
+            section.classList.add('calendar-section');
+            section.innerHTML = `<h2>${type.title}</h2><p>${type.message}</p>`;
 
-            flatpickr(`#calendar-${spec.id}`, {
-                mode: "multiple",
-                dateFormat: "Y-m-d",
-                minDate: "today",
-                clickOpens: true, // default, opens when input clicked
-                onClose: function (selectedDates, dateStr, instance) {
-                    // Prevent closing if the date popup is still open
-                    const popup = document.querySelector('.date-popup-overlay');
-                    if (popup) {
-                        instance.open(); // reopen the calendar if popup exists
-                    }
-                },
-                onChange: function (selectedDatesArr, dateStr, instance) {
-                    const lastSelected = instance.latestSelectedDateObj;
-                    if (!lastSelected) return;
+            specialties.forEach(spec => {
+                const card = document.createElement('div');
+                card.classList.add('spec-card');
+                card.innerHTML = `
+                    <h3>${spec.name}</h3>
+                    
+                `;
+                section.appendChild(card);
 
-                    // Use local date to avoid UTC shifts
-                    const year = lastSelected.getFullYear();
-                    const month = (lastSelected.getMonth() + 1).toString().padStart(2, '0');
-                    const day = lastSelected.getDate().toString().padStart(2, '0');
-                    const formattedDate = `${year}-${month}-${day}`;
+                const input = document.createElement('input');
+                input.id = `${type.key}-${spec.id}`;
+                input.type = "text";
+                input.classList.add('calendar-input');
+                input.placeholder = "Selecionar datas";
+                input.readOnly = true;
 
-                    const stillSelected = selectedDatesArr.some(d => {
-                        return d.getFullYear() === lastSelected.getFullYear() &&
+                card.appendChild(input);
+
+                // ensure structure exists
+                selectedDates[type.key] = selectedDates[type.key] || {};
+                selectedDates[type.key][spec.id] = selectedDates[type.key][spec.id] || [];
+
+                flatpickr(input, {
+                    mode: "multiple",
+                    dateFormat: "Y-m-d",
+                    minDate: "today",
+                    onClose: function (selectedDates, dateStr, instance) {
+                        const popup = document.querySelector('.date-popup-overlay');
+                        if (popup) { instance.open(); }
+                    },
+                    onChange: function (selectedDatesArr, dateStr, instance) {
+                        const lastSelected = instance.latestSelectedDateObj;
+                        if (!lastSelected) return;
+
+                        const year = lastSelected.getFullYear();
+                        const month = (lastSelected.getMonth() + 1).toString().padStart(2, '0');
+                        const day = lastSelected.getDate().toString().padStart(2, '0');
+                        const formattedDate = `${year}-${month}-${day}`;
+
+                        const stillSelected = selectedDatesArr.some(d =>
+                            d.getFullYear() === lastSelected.getFullYear() &&
                             d.getMonth() === lastSelected.getMonth() &&
-                            d.getDate() === lastSelected.getDate();
-                    });
+                            d.getDate() === lastSelected.getDate()
+                        );
 
-                    if (stillSelected) {
-                        showDatePopup(spec.id, formattedDate, instance.calendarContainer);
-                    } else {
-                        removeDate(spec.id, formattedDate);
-                        const existingPopup = document.querySelector('.date-popup-overlay');
-                        if (existingPopup) existingPopup.remove();
-                        updateInputDisplay(spec.id);
+                        if (stillSelected) {
+                            showDatePopup(type.key, spec.id, formattedDate, instance.calendarContainer);
+                        } else {
+                            removeDate(type.key, spec.id, formattedDate);
+                            updateInputDisplay(type.key, spec.id);
+                            const oldPopup = document.querySelector('.date-popup-overlay');
+                            if (oldPopup) oldPopup.remove();
+                        }
                     }
-                }
+                });
             });
 
+            container.appendChild(section);
         });
-
-        log('Specialty cards created.');
     }
 
     // ---------------------
     // Remove date from selectedDates
     // ---------------------
-    function removeDate(specId, date) {
-        if (!selectedDates[specId]) return;
-        selectedDates[specId] = selectedDates[specId].filter(d => !d.DataInicio.startsWith(date));
+    function removeDate(type, specId, date) {
+        if (!selectedDates[type]?.[specId]) return;
+        selectedDates[type][specId] = selectedDates[type][specId].filter(d => !d.DataInicio.startsWith(date));
     }
 
     // ---------------------
     // Update text input display
     // ---------------------
-    function updateInputDisplay(specId) {
-        const input = document.getElementById(`calendar-${specId}`);
+    function updateInputDisplay(type, specId) {
+        const input = document.getElementById(`${type}-${specId}`);
         if (!input) return;
-        input.value = (selectedDates[specId] || []).map(d => {
+        input.value = (selectedDates[type][specId] || []).map(d => {
             const di = d.DataInicio.split('T')[0];
             const ti = d.DataInicio.split('T')[1].slice(0, 5);
             const tf = d.DataFim.split('T')[1].slice(0, 5);
@@ -130,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------
     // Date popup overlay
     // ---------------------
-    function showDatePopup(specId, date, calendarContainer) {
+    function showDatePopup(type, specId, date, calendarContainer) {
         const oldPopup = document.querySelector('.date-popup-overlay');
         if (oldPopup) oldPopup.remove();
 
@@ -148,21 +166,21 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.style.left = rect.left + window.scrollX + 'px';
         overlay.style.width = rect.width + 'px';
 
-        const existing = selectedDates[specId].find(d => d.DataInicio.startsWith(date)) || {
+        const existing = selectedDates[type][specId].find(d => d.DataInicio.startsWith(date)) || {
             DataInicio: `${date}T00:00:00.000Z`,
             DataFim: `${date}T23:59:00.000Z`
         };
         let allDay = existing.DataInicio.endsWith("00:00:00.000Z") && existing.DataFim.endsWith("23:59:00.000Z");
 
         overlay.innerHTML = `
-            <div style="margin-bottom:10px;"><strong>${date}</strong></div>
-            <label><input type="checkbox" id="popupAllDay" ${allDay ? 'checked' : ''}> All day</label>
-            <div style="margin-top:10px;">
-                Start: <input type="time" id="popupStart" value="${existing.DataInicio.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
-                End: <input type="time" id="popupEnd" value="${existing.DataFim.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
-            </div>
-            <button id="popupSave" style="margin-top:10px;">Save</button>
-        `;
+        <div style="margin-bottom:10px;"><strong>${date}</strong></div>
+        <label><input type="checkbox" id="popupAllDay" ${allDay ? 'checked' : ''}> All day</label>
+        <div style="margin-top:10px;">
+            Start: <input type="time" id="popupStart" value="${existing.DataInicio.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
+            End: <input type="time" id="popupEnd" value="${existing.DataFim.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
+        </div>
+        <button id="popupSave" style="margin-top:10px;">Save</button>
+    `;
         document.body.appendChild(overlay);
 
         const chkAllDay = document.getElementById('popupAllDay');
@@ -179,23 +197,28 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.addEventListener('click', () => {
             const start = chkAllDay.checked ? "00:00" : startInput.value || "09:00";
             const end = chkAllDay.checked ? "23:59" : endInput.value || "17:00";
-
             const DataInicio = `${date}T${start}:00.000Z`;
             const DataFim = `${date}T${end}:00.000Z`;
 
-            const idx = selectedDates[specId].findIndex(d => d.DataInicio.startsWith(date));
-            if (idx !== -1) selectedDates[specId][idx] = { DataInicio, DataFim };
-            else selectedDates[specId].push({ DataInicio, DataFim });
+            const idx = selectedDates[type][specId].findIndex(d => d.DataInicio.startsWith(date));
+            if (idx !== -1) selectedDates[type][specId][idx] = { DataInicio, DataFim };
+            else selectedDates[type][specId].push({ DataInicio, DataFim });
 
-            updateInputDisplay(specId);
-
+            updateInputDisplay(type, specId);
             overlay.remove();
         });
 
-        // Close popup only if click outside BOTH calendar and popup
+        // Close popup if click outside
         document.addEventListener('click', function handleClickOutside(e) {
             const calendar = calendarContainer;
             if (!calendar.contains(e.target) && !overlay.contains(e.target)) {
+                // Apply default all-day if date exists but popup dismissed
+                if (!selectedDates[type][specId].some(d => d.DataInicio.startsWith(date))) {
+                    const DataInicio = `${date}T00:00:00.000Z`;
+                    const DataFim = `${date}T23:59:00.000Z`;
+                    selectedDates[type][specId].push({ DataInicio, DataFim });
+                    updateInputDisplay(type, specId);
+                }
                 overlay.remove();
                 document.removeEventListener('click', handleClickOutside);
             }
@@ -203,15 +226,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------------------
-    // Add all dates to all specialties
+    // Add all blocked (holiday) dates to all specialties
     // ---------------------
-    addAllBtn.addEventListener('click', () => {
-        const allDates = Object.values(selectedDates).flat();
+    addAllBtnClose.addEventListener('click', () => {
+        const allHolidays = selectedDates.holidays || {};
+        const merged = Object.values(allHolidays).flat();
+
         specialties.forEach(spec => {
-            selectedDates[spec.id] = JSON.parse(JSON.stringify(allDates));
-            updateInputDisplay(spec.id);
+            selectedDates.holidays[spec.id] = JSON.parse(JSON.stringify(merged));
+
+            // Update flatpickr
+            const input = document.getElementById(`holidays-${spec.id}`);
+            if (input && input._flatpickr) {
+                const dateObjs = selectedDates.holidays[spec.id].map(d => new Date(d.DataInicio));
+                input._flatpickr.setDate(dateObjs, true);
+            }
+
+            updateInputDisplay('holidays', spec.id);
         });
-        log('Added all selected dates to all specialties.');
+
+        log('Added all holiday dates to all specialties.');
+    });
+
+
+    // ---------------------
+    // Add all open-exception dates to all specialties
+    // ---------------------
+    addAllBtnOpen.addEventListener('click', () => {
+        const allOpen = selectedDates.openExceptions || {};
+        const merged = Object.values(allOpen).flat();
+
+        specialties.forEach(spec => {
+            selectedDates.openExceptions[spec.id] = JSON.parse(JSON.stringify(merged));
+
+            // Update flatpickr
+            const input = document.getElementById(`openExceptions-${spec.id}`);
+            if (input && input._flatpickr) {
+                const dateObjs = selectedDates.openExceptions[spec.id].map(d => new Date(d.DataInicio));
+                input._flatpickr.setDate(dateObjs, true);
+            }
+
+            updateInputDisplay('openExceptions', spec.id);
+        });
+
+        log('Added all open-exception dates to all specialties.');
     });
 
     // ---------------------
@@ -219,7 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------
     saveBtn.addEventListener('click', async () => {
         const holidaysMessage = holidayMsgInput.value || "Encontramo-nos em férias!";
-        const calendarData = { holidays: selectedDates, holidaysMessage };
+        const calendarData = {
+            holidays: selectedDates.holidays || {},
+            openExceptions: selectedDates.openExceptions || {},
+            holidaysMessage
+        };
         loadingOverlay.classList.add('active');
         log('Saving calendar...');
 
@@ -249,30 +311,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.electronAPI.onRepoSynced(calendar => {
             loadingOverlay.classList.remove('active');
-            const rawHolidays = calendar.holidays || {};
-            const filtered = {};
 
-            for (const [specId, days] of Object.entries(rawHolidays)) {
-                filtered[specId] = days.filter(d => {
-                    const date = new Date(d.DataInicio);
-                    date.setHours(0, 0, 0, 0);
-                    return date >= today;
-                });
+            const rawHolidays = calendar.holidays || {};
+            const rawOpens = calendar.openExceptions || {};
+            const filtered = { holidays: {}, openExceptions: {} };
+
+            for (const type of ['holidays', 'openExceptions']) {
+                const source = type === 'holidays' ? rawHolidays : rawOpens;
+                for (const [specId, days] of Object.entries(source)) {
+                    filtered[type][specId] = days.filter(d => {
+                        const date = new Date(d.DataInicio);
+                        date.setHours(0, 0, 0, 0);
+                        return date >= today;
+                    });
+                }
             }
 
             selectedDates = filtered;
             holidayMsgInput.value = calendar.holidaysMessage || '';
 
-            specialties.forEach(spec => {
-                const input = document.getElementById(`calendar-${spec.id}`);
-                if (input && input._flatpickr) {
-                    const dates = (selectedDates[spec.id] || []).map(d => new Date(d.DataInicio));
-                    input._flatpickr.setDate(dates);
-                    updateInputDisplay(spec.id);
-                }
+            calendarTypes.forEach(type => {
+                specialties.forEach(spec => {
+                    const input = document.getElementById(`${type.key}-${spec.id}`);
+                    if (input && input._flatpickr) {
+                        const dates = (selectedDates[type.key][spec.id] || []).map(d => new Date(d.DataInicio));
+                        input._flatpickr.setDate(dates);
+                        updateInputDisplay(type.key, spec.id);
+                    }
+                });
             });
 
-            log('Repository synced and filtered calendar loaded.');
+            log('Repository synced and both holiday & open exception calendars loaded.');
         });
 
         window.electronAPI.onRepoSyncError(msg => {
