@@ -4,22 +4,32 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 1, name: "Ginecologia/Obstetrícia" },
         { id: 2, name: "Pediatria" },
     ];
+
     const calendarTypes = [
-        { key: "holidays", title: "Fechados", message: "Dias em que estamos fechados" },
-        { key: "openExceptions", title: "Abertos Excecionalmente", message: "Dias em que estamos abertos apesar de ser feriado" }
+        { key: "holidays", title: "Fechados", message: "Dias em que estamos fechados." },
+        { key: "openExceptions", title: "Abertos Excecionalmente", message: "Dias em que estamos abertos apesar de ser feriado." }
     ];
+
+    const locations = ["Porto", "SantoTirso"];
+    let currentLocation = "Porto";
 
     const specContainer = document.getElementById('specContainer');
     const addAllBtnClose = document.getElementById('addAllBtnClose');
-    const addAllBtnOpen = document.getElementById('addAllBtnOpen')
+    const addAllBtnOpen = document.getElementById('addAllBtnOpen');
     const saveBtn = document.getElementById('saveBtn');
     const holidayMsgInput = document.getElementById('holidayMsg');
     const loadingOverlay = document.getElementById('loadingOverlay');
     const notificationEl = document.getElementById('notification');
 
-    let selectedDates = {};
+    let selectedDates = {
+        holidays: {},
+        openExceptions: { Porto: {}, SantoTirso: {} }
+    };
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    let ignoreNextFlatpickrChange = false;
 
     // ---------------------
     // Auto-grow textarea
@@ -34,9 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------
     async function log(message) {
         console.log(message);
-        if (window.electronAPI?.logMessage) {
-            await window.electronAPI.logMessage(message);
-        }
+        if (window.electronAPI?.logMessage) await window.electronAPI.logMessage(message);
     }
 
     // ---------------------
@@ -51,93 +59,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------------------
-    // Create specialty cards
-    // ---------------------
-    function createSpecialtyCards() {
-        const container = document.getElementById('specContainer');
-        container.innerHTML = '';
-
-        calendarTypes.forEach(type => {
-            const section = document.createElement('section');
-            section.classList.add('calendar-section');
-            section.innerHTML = `<h2>${type.title}</h2><p>${type.message}</p>`;
-
-            specialties.forEach(spec => {
-                const card = document.createElement('div');
-                card.classList.add('spec-card');
-                card.innerHTML = `
-                    <h3>${spec.name}</h3>
-                    
-                `;
-                section.appendChild(card);
-
-                const input = document.createElement('input');
-                input.id = `${type.key}-${spec.id}`;
-                input.type = "text";
-                input.classList.add('calendar-input');
-                input.placeholder = "Selecionar datas";
-                input.readOnly = true;
-
-                card.appendChild(input);
-
-                // ensure structure exists
-                selectedDates[type.key] = selectedDates[type.key] || {};
-                selectedDates[type.key][spec.id] = selectedDates[type.key][spec.id] || [];
-
-                flatpickr(input, {
-                    mode: "multiple",
-                    dateFormat: "Y-m-d",
-                    minDate: "today",
-                    onClose: function (selectedDates, dateStr, instance) {
-                        const popup = document.querySelector('.date-popup-overlay');
-                        if (popup) { instance.open(); }
-                    },
-                    onChange: function (selectedDatesArr, dateStr, instance) {
-                        const lastSelected = instance.latestSelectedDateObj;
-                        if (!lastSelected) return;
-
-                        const year = lastSelected.getFullYear();
-                        const month = (lastSelected.getMonth() + 1).toString().padStart(2, '0');
-                        const day = lastSelected.getDate().toString().padStart(2, '0');
-                        const formattedDate = `${year}-${month}-${day}`;
-
-                        const stillSelected = selectedDatesArr.some(d =>
-                            d.getFullYear() === lastSelected.getFullYear() &&
-                            d.getMonth() === lastSelected.getMonth() &&
-                            d.getDate() === lastSelected.getDate()
-                        );
-
-                        if (stillSelected) {
-                            showDatePopup(type.key, spec.id, formattedDate, instance.calendarContainer);
-                        } else {
-                            removeDate(type.key, spec.id, formattedDate);
-                            updateInputDisplay(type.key, spec.id);
-                            const oldPopup = document.querySelector('.date-popup-overlay');
-                            if (oldPopup) oldPopup.remove();
-                        }
-                    }
-                });
-            });
-
-            container.appendChild(section);
-        });
-    }
-
-    // ---------------------
-    // Remove date from selectedDates
+    // Remove date
     // ---------------------
     function removeDate(type, specId, date) {
-        if (!selectedDates[type]?.[specId]) return;
-        selectedDates[type][specId] = selectedDates[type][specId].filter(d => !d.DataInicio.startsWith(date));
+        let arr = type === 'openExceptions'
+            ? selectedDates.openExceptions[currentLocation][specId]
+            : selectedDates.holidays[specId];
+        if (!arr) return;
+        arr = arr.filter(d => !d.DataInicio.startsWith(date));
+        if (type === 'openExceptions') selectedDates.openExceptions[currentLocation][specId] = arr;
+        else selectedDates.holidays[specId] = arr;
     }
 
     // ---------------------
-    // Update text input display
+    // Update input display
     // ---------------------
     function updateInputDisplay(type, specId) {
         const input = document.getElementById(`${type}-${specId}`);
         if (!input) return;
-        input.value = (selectedDates[type][specId] || []).map(d => {
+
+        const arr = type === 'openExceptions'
+            ? selectedDates.openExceptions[currentLocation][specId] || []
+            : selectedDates.holidays[specId] || [];
+
+        input.value = arr.map(d => {
             const di = d.DataInicio.split('T')[0];
             const ti = d.DataInicio.split('T')[1].slice(0, 5);
             const tf = d.DataFim.split('T')[1].slice(0, 5);
@@ -146,41 +91,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------------------
-    // Date popup overlay
+    // Show date popup
     // ---------------------
-    function showDatePopup(type, specId, date, calendarContainer) {
+    function showDatePopup(type, specId, date, inputEl) {
         const oldPopup = document.querySelector('.date-popup-overlay');
         if (oldPopup) oldPopup.remove();
+        if (!inputEl) return;
 
+        const rect = inputEl.getBoundingClientRect();
         const overlay = document.createElement('div');
         overlay.className = 'date-popup-overlay';
         overlay.style.position = 'absolute';
+        overlay.style.top = rect.bottom + window.scrollY + 'px';
+        overlay.style.left = rect.left + window.scrollX + 'px';
+        overlay.style.width = rect.width + 'px';
         overlay.style.background = 'white';
         overlay.style.padding = '15px';
         overlay.style.borderRadius = '8px';
         overlay.style.boxShadow = '0 4px 15px rgba(0,0,0,0.25)';
         overlay.style.zIndex = 2000;
 
-        const rect = calendarContainer.getBoundingClientRect();
-        overlay.style.top = rect.bottom + window.scrollY + 'px';
-        overlay.style.left = rect.left + window.scrollX + 'px';
-        overlay.style.width = rect.width + 'px';
+        const arr = type === 'openExceptions'
+            ? selectedDates.openExceptions[currentLocation][specId] || []
+            : selectedDates.holidays[specId] || [];
 
-        const existing = selectedDates[type][specId].find(d => d.DataInicio.startsWith(date)) || {
+        const existing = arr.find(d => d.DataInicio.startsWith(date)) || {
             DataInicio: `${date}T00:00:00.000Z`,
             DataFim: `${date}T23:59:00.000Z`
         };
-        let allDay = existing.DataInicio.endsWith("00:00:00.000Z") && existing.DataFim.endsWith("23:59:00.000Z");
+        const allDay = existing.DataInicio.endsWith("00:00:00.000Z") && existing.DataFim.endsWith("23:59:00.000Z");
 
         overlay.innerHTML = `
-        <div style="margin-bottom:10px;"><strong>${date}</strong></div>
-        <label><input type="checkbox" id="popupAllDay" ${allDay ? 'checked' : ''}> All day</label>
-        <div style="margin-top:10px;">
-            Start: <input type="time" id="popupStart" value="${existing.DataInicio.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
-            End: <input type="time" id="popupEnd" value="${existing.DataFim.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
-        </div>
-        <button id="popupSave" style="margin-top:10px;">Save</button>
-    `;
+            <div style="margin-bottom:10px;"><strong>${date}</strong></div>
+            <label><input type="checkbox" id="popupAllDay" ${allDay ? 'checked' : ''}> All day</label>
+            <div style="margin-top:10px;">
+                Start: <input type="time" id="popupStart" value="${existing.DataInicio.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
+                End: <input type="time" id="popupEnd" value="${existing.DataFim.split('T')[1].slice(0, 5)}" ${allDay ? 'disabled' : ''}>
+            </div>
+            <button id="popupSave" style="margin-top:10px;">Save</button>
+        `;
+
         document.body.appendChild(overlay);
 
         const chkAllDay = document.getElementById('popupAllDay');
@@ -200,75 +150,169 @@ document.addEventListener('DOMContentLoaded', () => {
             const DataInicio = `${date}T${start}:00.000Z`;
             const DataFim = `${date}T${end}:00.000Z`;
 
-            const idx = selectedDates[type][specId].findIndex(d => d.DataInicio.startsWith(date));
-            if (idx !== -1) selectedDates[type][specId][idx] = { DataInicio, DataFim };
-            else selectedDates[type][specId].push({ DataInicio, DataFim });
+            const idx = arr.findIndex(d => d.DataInicio.startsWith(date));
+            if (idx !== -1) arr[idx] = { DataInicio, DataFim };
+            else arr.push({ DataInicio, DataFim });
+
+            if (type === 'openExceptions') selectedDates.openExceptions[currentLocation][specId] = arr;
+            else selectedDates.holidays[specId] = arr;
 
             updateInputDisplay(type, specId);
             overlay.remove();
         });
 
-        // Close popup if click outside
-        document.addEventListener('click', function handleClickOutside(e) {
-            const calendar = calendarContainer;
-            if (!calendar.contains(e.target) && !overlay.contains(e.target)) {
-                // Apply default all-day if date exists but popup dismissed
-                if (!selectedDates[type][specId].some(d => d.DataInicio.startsWith(date))) {
-                    const DataInicio = `${date}T00:00:00.000Z`;
-                    const DataFim = `${date}T23:59:00.000Z`;
-                    selectedDates[type][specId].push({ DataInicio, DataFim });
-                    updateInputDisplay(type, specId);
-                }
+        function handleClickOutside(e) {
+            if (!inputEl.contains(e.target) && !overlay.contains(e.target)) {
                 overlay.remove();
                 document.removeEventListener('click', handleClickOutside);
             }
+        }
+        document.addEventListener('click', handleClickOutside);
+    }
+
+    // ---------------------
+    // Create specialty cards
+    // ---------------------
+    function createSpecialtyCards() {
+        specContainer.innerHTML = '';
+
+        const locDiv = document.createElement('div');
+        locDiv.classList.add('location-selector');
+        locDiv.innerHTML = `
+            <label for="locationSelect">Localização:</label>
+            <select id="locationSelect">
+                ${locations.map(loc => `<option value="${loc}" ${loc === currentLocation ? 'selected' : ''}>${loc}</option>`).join('')}
+            </select>
+        `;
+        specContainer.appendChild(locDiv);
+
+        const newSelect = locDiv.querySelector('#locationSelect');
+        newSelect.addEventListener('change', () => {
+            currentLocation = newSelect.value;
+            createSpecialtyCards();
+            updateUIFromSelectedDates();
+        });
+
+        calendarTypes.forEach(type => {
+            const section = document.createElement('section');
+            section.classList.add('calendar-section');
+            section.innerHTML = `<h2>${type.title}</h2><p>${type.message}</p>`;
+
+            specialties.forEach(spec => {
+                if (currentLocation === "SantoTirso" && spec.id === 2 && type.key === "openExceptions") return;
+
+                const card = document.createElement('div');
+                card.classList.add('spec-card');
+                card.innerHTML = `<h3>${spec.name}</h3>`;
+                section.appendChild(card);
+
+                const input = document.createElement('input');
+                input.id = `${type.key}-${spec.id}`;
+                input.type = "text";
+                input.classList.add('calendar-input');
+                input.placeholder = "Selecionar datas";
+                input.readOnly = true;
+                card.appendChild(input);
+
+                if (type.key === 'openExceptions') {
+                    selectedDates.openExceptions[currentLocation][spec.id] = selectedDates.openExceptions[currentLocation][spec.id] || [];
+                } else {
+                    selectedDates.holidays[spec.id] = selectedDates.holidays[spec.id] || [];
+                }
+
+                flatpickr(input, {
+                    mode: "multiple",
+                    dateFormat: "Y-m-d",
+                    minDate: "today",
+                    onChange: function (selectedDatesArr, dateStr, instance) {
+                        if (ignoreNextFlatpickrChange) return;
+
+                        const lastSelected = instance.latestSelectedDateObj;
+                        if (!lastSelected) return;
+
+                        const year = lastSelected.getFullYear();
+                        const month = (lastSelected.getMonth() + 1).toString().padStart(2, '0');
+                        const day = lastSelected.getDate().toString().padStart(2, '0');
+                        const formattedDate = `${year}-${month}-${day}`;
+
+                        const stillSelected = selectedDatesArr.some(d =>
+                            d.getFullYear() === lastSelected.getFullYear() &&
+                            d.getMonth() === lastSelected.getMonth() &&
+                            d.getDate() === lastSelected.getDate()
+                        );
+
+                        const oldPopup = document.querySelector('.date-popup-overlay');
+                        if (oldPopup) oldPopup.remove();
+
+                        if (stillSelected) {
+                            showDatePopup(type.key, spec.id, formattedDate, instance.input);
+                        } else {
+                            removeDate(type.key, spec.id, formattedDate);
+                            updateInputDisplay(type.key, spec.id);
+                        }
+                    }
+                });
+            });
+
+            specContainer.appendChild(section);
         });
     }
 
     // ---------------------
-    // Add all blocked (holiday) dates to all specialties
+    // Update UI from selectedDates
+    // ---------------------
+    function updateUIFromSelectedDates() {
+        calendarTypes.forEach(type => {
+            specialties.forEach(spec => {
+                if (currentLocation === "SantoTirso" && spec.id === 2 && type.key === "openExceptions") return;
+
+                const input = document.getElementById(`${type.key}-${spec.id}`);
+                if (!input || !input._flatpickr) return;
+
+                const arr = type.key === 'openExceptions'
+                    ? selectedDates.openExceptions[currentLocation][spec.id] || []
+                    : selectedDates.holidays[spec.id] || [];
+
+                ignoreNextFlatpickrChange = true;
+                input._flatpickr.setDate(arr.map(d => new Date(d.DataInicio)), true);
+                ignoreNextFlatpickrChange = false;
+
+                updateInputDisplay(type.key, spec.id);
+            });
+        });
+    }
+
+    // ---------------------
+    // Add all buttons
     // ---------------------
     addAllBtnClose.addEventListener('click', () => {
-        const allHolidays = selectedDates.holidays || {};
-        const merged = Object.values(allHolidays).flat();
-
+        const merged = Object.values(selectedDates.holidays).flat();
         specialties.forEach(spec => {
             selectedDates.holidays[spec.id] = JSON.parse(JSON.stringify(merged));
-
-            // Update flatpickr
             const input = document.getElementById(`holidays-${spec.id}`);
             if (input && input._flatpickr) {
-                const dateObjs = selectedDates.holidays[spec.id].map(d => new Date(d.DataInicio));
-                input._flatpickr.setDate(dateObjs, true);
+                ignoreNextFlatpickrChange = true;
+                input._flatpickr.setDate(merged.map(d => new Date(d.DataInicio)), true);
+                ignoreNextFlatpickrChange = false;
             }
-
             updateInputDisplay('holidays', spec.id);
         });
-
         log('Added all holiday dates to all specialties.');
     });
 
-
-    // ---------------------
-    // Add all open-exception dates to all specialties
-    // ---------------------
     addAllBtnOpen.addEventListener('click', () => {
-        const allOpen = selectedDates.openExceptions || {};
-        const merged = Object.values(allOpen).flat();
-
+        const merged = Object.values(selectedDates.openExceptions[currentLocation] || {}).flat();
         specialties.forEach(spec => {
-            selectedDates.openExceptions[spec.id] = JSON.parse(JSON.stringify(merged));
-
-            // Update flatpickr
+            if (currentLocation === "SantoTirso" && spec.id === 2) return;
+            selectedDates.openExceptions[currentLocation][spec.id] = JSON.parse(JSON.stringify(merged));
             const input = document.getElementById(`openExceptions-${spec.id}`);
             if (input && input._flatpickr) {
-                const dateObjs = selectedDates.openExceptions[spec.id].map(d => new Date(d.DataInicio));
-                input._flatpickr.setDate(dateObjs, true);
+                ignoreNextFlatpickrChange = true;
+                input._flatpickr.setDate(merged.map(d => new Date(d.DataInicio)), true);
+                ignoreNextFlatpickrChange = false;
             }
-
             updateInputDisplay('openExceptions', spec.id);
         });
-
         log('Added all open-exception dates to all specialties.');
     });
 
@@ -277,14 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------
     saveBtn.addEventListener('click', async () => {
         const holidaysMessage = holidayMsgInput.value || "Encontramo-nos em férias!";
-        const calendarData = {
-            holidays: selectedDates.holidays || {},
-            openExceptions: selectedDates.openExceptions || {},
-            holidaysMessage
-        };
+        const calendarData = { holidays: selectedDates.holidays, openExceptions: selectedDates.openExceptions, holidaysMessage };
         loadingOverlay.classList.add('active');
-        log('Saving calendar...');
-
         try {
             const result = await window.electronAPI.saveCalendar(calendarData, 'Update calendar');
             loadingOverlay.classList.remove('active');
@@ -298,57 +336,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ---------------------
+    // Repo synced
+    // ---------------------
+    window.electronAPI.onRepoSynced(calendar => {
+        loadingOverlay.classList.remove('active');
+        const rawHolidays = calendar.holidays || {};
+        const rawOpens = calendar.openExceptions || {};
+        const filtered = { holidays: {}, openExceptions: { Porto: {}, SantoTirso: {} } };
+
+        for (const type of ['holidays', 'openExceptions']) {
+            const source = type === 'holidays' ? rawHolidays : rawOpens;
+            if (type === 'holidays') {
+                for (const [specId, days] of Object.entries(source)) {
+                    filtered.holidays[specId] = days.filter(d => new Date(d.DataInicio) >= today);
+                }
+            } else {
+                for (const loc of locations) {
+                    filtered.openExceptions[loc] = filtered.openExceptions[loc] || {};
+                    for (const [specId, days] of Object.entries(source[loc] || {})) {
+                        filtered.openExceptions[loc][specId] = days.filter(d => new Date(d.DataInicio) >= today);
+                    }
+                }
+            }
+        }
+
+        selectedDates = filtered;
+        holidayMsgInput.value = calendar.holidaysMessage || '';
+        updateUIFromSelectedDates();
+        log('Repository synced.');
+    });
+
+    // ---------------------
     // Init
     // ---------------------
     async function init() {
         loadingOverlay.classList.add('active');
-        window.electronAPI.onRepoLoading(msg => {
-            loadingOverlay.classList.add('active');
-            log('Repo loading: ' + msg);
-        });
-
         createSpecialtyCards();
-
-        window.electronAPI.onRepoSynced(calendar => {
-            loadingOverlay.classList.remove('active');
-
-            const rawHolidays = calendar.holidays || {};
-            const rawOpens = calendar.openExceptions || {};
-            const filtered = { holidays: {}, openExceptions: {} };
-
-            for (const type of ['holidays', 'openExceptions']) {
-                const source = type === 'holidays' ? rawHolidays : rawOpens;
-                for (const [specId, days] of Object.entries(source)) {
-                    filtered[type][specId] = days.filter(d => {
-                        const date = new Date(d.DataInicio);
-                        date.setHours(0, 0, 0, 0);
-                        return date >= today;
-                    });
-                }
-            }
-
-            selectedDates = filtered;
-            holidayMsgInput.value = calendar.holidaysMessage || '';
-
-            calendarTypes.forEach(type => {
-                specialties.forEach(spec => {
-                    const input = document.getElementById(`${type.key}-${spec.id}`);
-                    if (input && input._flatpickr) {
-                        const dates = (selectedDates[type.key][spec.id] || []).map(d => new Date(d.DataInicio));
-                        input._flatpickr.setDate(dates);
-                        updateInputDisplay(type.key, spec.id);
-                    }
-                });
-            });
-
-            log('Repository synced and both holiday & open exception calendars loaded.');
-        });
-
-        window.electronAPI.onRepoSyncError(msg => {
-            showNotification('Error syncing repo: ' + msg, true);
-            log('Repo sync error: ' + msg);
-        });
-
         await window.electronAPI.readyToReceive();
     }
 

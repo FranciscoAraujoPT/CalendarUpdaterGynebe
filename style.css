@@ -1,4 +1,4 @@
-/* General body */
+/* === General body & layout === */
 body {
     font-family: 'Segoe UI', sans-serif;
     background: #f4f6f8;
@@ -86,33 +86,41 @@ button.primary:hover {
     overflow: hidden;
     min-height: 40px;
     box-sizing: border-box;
+    transition: height 0.2s ease;
 }
 
 #holidayMsg:focus {
     outline: none;
 }
 
-#holidayMsg {
-    transition: height 0.2s ease;
-}
-
-/* Specialty cards container */
-.specialties {
+/* Spec container single column */
+#specContainer {
     display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
+    flex-direction: column;
+    gap: 2rem;
+    align-items: stretch;
 }
 
-/* Specialty card */
+/* Specialty cards and calendar sections */
+.calendar-section {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.calendar-section h2 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+
 .spec-card {
     background: white;
     padding: 20px;
     border-radius: 12px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-    flex: 1 1 280px;
-    min-width: 280px;
+    margin: 10px 0;
     transition: transform 0.2s, box-shadow 0.2s;
-    margin: 10px;
 }
 
 .spec-card:hover {
@@ -138,6 +146,46 @@ button.primary:hover {
     overflow-y: hidden;
     min-height: 38px;
     box-sizing: border-box;
+}
+
+/* Location selector */
+.location-selector {
+    margin: 25px 0;
+    background: white;
+    width: fit-content;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.location-selector label {
+    font-weight: bold;
+    font-size: 16px;
+    color: #2c3e50;
+}
+
+#locationSelect {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+#locationSelect:hover {
+    border-color: #4a90e2;
+}
+
+#locationSelect:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25);
 }
 
 /* Loading overlay */
@@ -190,7 +238,6 @@ button.primary:hover {
     border: 1px solid #ccc;
 }
 
-/* Popup states */
 .date-popup-overlay.show {
     opacity: 1;
     transform: scale(1);
@@ -204,7 +251,6 @@ button.primary:hover {
     display: none;
 }
 
-/* Inputs inside popup */
 .date-popup-overlay input[type="time"] {
     padding: 5px 8px;
     margin-left: 5px;
@@ -217,7 +263,6 @@ button.primary:hover {
     margin-right: 5px;
 }
 
-/* Save button inside popup */
 .date-popup-overlay button {
     margin-top: 10px;
     padding: 8px 14px;
@@ -263,7 +308,14 @@ footer {
     flex-shrink: 0;
 }
 
-/* === Flatpickr Calendar Layer Fix === */
+/* Flatpickr calendar fix */
 .flatpickr-calendar {
     z-index: 999 !important;
+}
+
+/* Responsive mobile */
+@media (max-width: 768px) {
+    #specContainer {
+        flex-direction: column;
+    }
 }
